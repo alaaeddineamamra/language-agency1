@@ -951,6 +951,28 @@
             background-clip: text;
             font-weight: 700;
         }
+        /* ===== Spinner للزر ===== */
+.spinner {
+    display: inline-block;
+    width: 18px;
+    height: 18px;
+    border: 3px solid rgba(255, 255, 255, 0.3);
+    border-radius: 50%;
+    border-top-color: #fff;
+    animation: spin 0.8s ease-in-out infinite;
+    vertical-align: middle;
+    margin-left: 8px;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+/* تعطيل الزر أثناء التحميل */
+.btn-submit:disabled {
+    opacity: 0.7 !important;
+    cursor: not-allowed !important;
+}
         .modal-box .btn-close-modal {
             margin-top: 24px;
             padding: 12px 44px;
@@ -1661,6 +1683,12 @@
         }
 
         function submitBooking() {
+    // 🔒 منع الضغط المزدوج
+    const submitBtn = document.querySelector('.btn-submit');
+    if (submitBtn.disabled) {
+        return; // إذا كان الزر معطلاً، لا تفعل شيئاً
+    }
+
     // التحقق من صحة البيانات
     if (!state.language || !state.program || state.days.length === 0 || !state.timeSlot ||
         !state.name || !state.phone || !state.email) {
@@ -1668,12 +1696,21 @@
         return;
     }
 
-    // 1. توليد رقم طلب فريد
+    // ⏳ تعطيل الزر وإظهار حالة التحميل
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = `
+        <span class="spinner"></span>
+        جاري الحجز...
+    `;
+    submitBtn.style.opacity = '0.7';
+    submitBtn.style.cursor = 'not-allowed';
+
+    // توليد رقم طلب فريد
     const now = new Date();
     const order = 'LNG-' + now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') +
         String(now.getDate()).padStart(2, '0') + '-' + String(Math.floor(Math.random() * 900) + 100);
 
-    // 2. تجهيز البيانات للإرسال إلى Google Sheets
+    // تجهيز البيانات
     const payload = {
         fullName: state.name,
         phone: state.phone,
@@ -1686,36 +1723,47 @@
         orderNumber: order
     };
 
-    // 3. رابط تطبيق Google Apps Script (ضع الرابط الخاص بك هنا)
-    const API_URL = 'https://script.google.com/macros/s/AKfycbx9BQIRqaB_u16NFeQw4kphSAjq3F6-qPMPjZmiBo1yqPfIcsrflo3bnFvMNYB-OnxnSw/exec';
+    const API_URL = 'https://script.google.com/macros/s/AKfycbz8MhfWLoXQK56LJp0waGM_tGci20GrhEmansIX9ymYEZ7GE94AGDqxhTtkA5Ki2CZcYg/exec';
 
-    // 4. إرسال البيانات إلى Google Sheets
+    // إرسال البيانات
     fetch(API_URL, {
         method: 'POST',
-        mode: 'no-cors', // مهم لتجنب مشاكل CORS
+        mode: 'no-cors',
         headers: {
             'Content-Type': 'application/json',
         },
         body: JSON.stringify(payload)
     })
     .then(() => {
-        // عرض مودال النجاح
+        // ✅ نجاح الحجز
         document.getElementById('orderNumber').textContent = '#' + order;
         document.getElementById('confirmModal').classList.add('show');
         document.body.style.overflow = 'hidden';
         
-        // إعادة تعيين النموذج بعد 5 ثواني
+        // 🔄 إعادة تعيين النموذج بعد 5 ثواني
         setTimeout(() => {
             resetForm();
+            // إعادة تفعيل الزر
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = `<i class="fas fa-check"></i> أرسل الحجز`;
+            submitBtn.style.opacity = '1';
+            submitBtn.style.cursor = 'pointer';
         }, 5000);
     })
     .catch((error) => {
         console.error('خطأ في الإرسال:', error);
-        // حتى لو فشل الإرسال، نعرض المودال للعميل
         alert('حدث خطأ تقني، لكن تم تسجيل طلبك. سيتم التواصل معك قريباً.');
         document.getElementById('orderNumber').textContent = '#' + order;
         document.getElementById('confirmModal').classList.add('show');
         document.body.style.overflow = 'hidden';
+        
+        // إعادة تفعيل الزر حتى في حالة الخطأ
+        setTimeout(() => {
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = `<i class="fas fa-check"></i> أرسل الحجز`;
+            submitBtn.style.opacity = '1';
+            submitBtn.style.cursor = 'pointer';
+        }, 3000);
     });
 }
 
